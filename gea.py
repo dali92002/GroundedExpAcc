@@ -102,6 +102,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate Grounded Explanation Accuracy (GEA)')
     parser.add_argument('--model_name', type=str, default="pix2struct", help='Name of the model to use') # will be used with including more models
     parser.add_argument('--set_path', type=str, default="examples/example.json", help='Path to the JSON dataset to test')
+    parser.add_argument('--plot_auc', type=bool, default=False, help='Plot the AUC curve')
     args = parser.parse_args()
 
     
@@ -128,17 +129,15 @@ if __name__ == "__main__":
         # Calculate the GEA accuracy
         result, all_show_anls, all_hide_anls = calculate_gea_accuracy(model, processor, image, boxes, question, answers)
         
-
         # Print the results
         print("GEA: ", result)
-        print("Show ANLS Scores: ", all_show_anls)
-        print("Hide ANLS Scores: ", all_hide_anls)
+        
+        if args.plot_auc:
+            # Plot the ANLS scores for show and hide images
+            plt.plot(all_show_anls, label="Show")
+            plt.plot(all_hide_anls, label="Hide")
+            plt.legend()
 
-        # Plot the ANLS scores for show and hide images
-        plt.plot(all_show_anls, label="Show")
-        plt.plot(all_hide_anls, label="Hide")
-        plt.legend()
-
-        # Save the plot to a file
-        plt.savefig(f"examples/gea_plot.png")
-        plt.close()
+            # Save the plot to a file
+            plt.savefig(f"examples/gea_auc_{sample['questionId']}.png")
+            plt.close()
