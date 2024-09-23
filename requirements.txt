@@ -1,0 +1,8 @@
+anls==0.0.2
+matplotlib==3.8.3
+numpy==2.1.1
+opencv_python==4.9.0.80
+Pillow==10.4.0
+torch==2.2.1
+tqdm==4.66.2
+transformers==4.41.0
