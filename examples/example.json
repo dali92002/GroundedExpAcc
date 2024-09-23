@@ -1,0 +1,22 @@
+{
+    "data": [
+        {
+            "questionId": 16404,
+            "question": "What is the title of William M. Coleman ?",
+            "question_types": [
+                "form"
+            ],
+            "image": "examples/fryn0081_p8.jpg",
+            "docId": 5167,
+            "ucsf_document_id": "fryn0081",
+            "ucsf_document_page_no": "9",
+            "answers": [
+                "Sr. R&D Chemist"
+            ],
+            "evidence": {
+                "positions": [[0.0843, 0.5203, 0.1508, 0.1897], [0.0855, 0.4330, 0.1810, 0.2176]]
+            },
+            "data_split": "test"
+        } 
+    ]
+}
