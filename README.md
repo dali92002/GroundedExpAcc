@@ -12,8 +12,6 @@ This project implements a method to calculate the Grounded Explanation Accuracy 
 To get started, clone this repository and install the necessary dependencies.
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
 pip install -r requirements.txt
 ```
 ## Usage
