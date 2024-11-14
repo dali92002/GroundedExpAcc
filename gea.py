@@ -13,7 +13,7 @@ from utilts import calculate_gea_accuracy
 
 SEED = 0
 GRID_SIZE = 3  # 3x3 grid
-COUNTED = 1 # number of samples to be counted for this test (for demonstration), set -1 for full dataset.
+COUNTED = 3 # number of samples to be counted for this test (for demonstration), set -1 for full dataset.
 
 def load_model_and_processor(model_name, device):
     """

@@ -6,3 +6,4 @@ Pillow==10.4.0
 torch==2.2.1
 tqdm==4.66.2
 transformers==4.41.0
+openai==1.53.0
