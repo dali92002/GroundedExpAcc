@@ -3,7 +3,6 @@ __pycache__
 *.pyo
 data
 .vscode/
-examples
 result*
 *.log
 *.csv

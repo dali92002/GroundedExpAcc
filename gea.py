@@ -13,6 +13,7 @@ from utilts import calculate_gea_accuracy
 
 SEED = 0
 GRID_SIZE = 3  # 3x3 grid
+COUNTED = 1 # number of samples to be counted for this test (for demonstration), set -1 for full dataset.
 
 def load_model_and_processor(model_name, device):
     """
@@ -75,9 +76,12 @@ def main():
 
     model, processor = load_model_and_processor(args.model_name, device)
     data_path = Path(args.data_path)
-    test_set = json.load(open(data_path / args.set_path, "r"))
+    test_set = json.load(open(data_path / args.set_name, "r"))
     total_accuracy = 0
-    sample_count = min(len(test_set["data"]), 1)  # For demonstration, limiting to n samples
+    if COUNTED == -1:
+        sample_count = len(test_set["data"])
+    else:
+        sample_count = min(len(test_set["data"]), COUNTED)  # For demonstration, limiting to n samples
 
     for sample in tqdm(test_set["data"][:sample_count]):
         img_path = data_path / "imgs" / sample["image"]

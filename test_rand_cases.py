@@ -140,7 +140,7 @@ def main():
     data_path = Path(args.data_path)
 
     model, processor = load_model_and_processor(args.model_name, device)
-    test_set = json.load(open(Path(args.data_path) / args.set_path, "r"))
+    test_set = json.load(open(Path(args.data_path) / args.set_name, "r"))
 
     calculate_and_store_results(
         data_path, test_set, args.model_name, model, processor, device, 

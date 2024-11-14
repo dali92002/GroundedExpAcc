@@ -12,7 +12,6 @@ from openai import OpenAI
 
 
 API_CREDENTIALS_PATH = '/home/msouibgui/gpt.yaml'
-OUTPUT_DIR = "/home/msouibgui/cvc/explainability/gpt_outputs"
 MODEL_NAME = "gpt-4o-mini" 
 
 
@@ -111,9 +110,6 @@ def predict_gpt(img, question):
         project="proj_fk22qmeTAvws8jLifooTBiMC"
     )
 
-
-    # Create Output Directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     # create PIL image from cv2 image
     

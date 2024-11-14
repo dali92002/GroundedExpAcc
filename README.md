@@ -35,21 +35,27 @@ The input data format is indicated in the following JSON. For this metric, the `
     ]
 }
 ```
+## Annotated Data (for small test)
+Few examples of SPDocVQA were anotated, download the data from [here](https://drive.google.com/file/d/1DadDauqHt0N1a5rlTi6csSsnrZEP-DEe/view?usp=sharing)
+
 ## Usage
 
 This script allows you to evaluate GEA for a set of image samples using a pre-trained Pix2Struct model. The model takes in a document image, questions, and evidence bounding boxes and calculates the ANLS score for both visible and occluded image regions.
 
-To use the script run the following
+To use the script run the following, you can change args for different settings.
 
 ```bash
-python gea.py --set_path examples/example.json
+python gea.py --data_path PATH/TO/DATA --set_name ann_pilot.json --batch_size 22 --method perturb --model_name pix2struct
 ```
 
 There are also other command-Line Arguments:
 
-- `--model_name`: (Optional) the name of the model to be used (default: "pix2struct").
-- `--set_path`: Path to the JSON dataset containing the image paths, questions, answers, and evidence bounding boxes.
-- `plot_auc`: (Optional) Set to `True` to generate plots showing the AUC (Area Under the Curve) for the visible and occluded regions. Default is `False`.
+- `--model_name`: (Optional) the name of the model to be used (default: "pix2struct" and you can use also "gpt", you have to specify your API_CREDENTIALS_PATH in this case and which GPT version you want to use), check the beginnig of the file [simple_gpt.py](simple_gpt.py).
+- `--method`: (Optional) which method or box manupilation to use `shrink` or `perturb`:
+  -  `shrink`: shrinking the box gradually
+  - `perturb`: masking some parts of the box randomely and gradually ugment the masked area.
+- `--set_name`: Path to the JSON file containing the image names, questions, answers, and evidence bounding boxes, etc. 
+- `--plot_auc`: (Optional) Set to `True` to generate plots showing the AUC (Area Under the Curve) for the visible and occluded regions. Default is `False`.
 
 The script will output the GEA which represent the Grounded Explanation Accuracy. The maximum accuracy is `1`. 
 
