@@ -1,143 +1,113 @@
-from PIL import Image
-from transformers import Pix2StructForConditionalGeneration, Pix2StructProcessor
-from anls import anls_score
+import os
+import json
+import random
 import torch
-from tqdm import tqdm
-import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-from create_perturbation import create_show_hide
-import random
-import json
-import argparse
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+from pathlib import Path
+from transformers import Pix2StructForConditionalGeneration, Pix2StructProcessor
+from args import create_args
+from utilts import calculate_gea_accuracy
 
-def predict_pix2struct(model, processor, img, question, answers):
+SEED = 0
+GRID_SIZE = 3  # 3x3 grid
+
+def load_model_and_processor(model_name, device):
     """
-    Predicts the answer to a question based on an image using the Pix2Struct model.
-
-    Args:
-        model: The pre-trained Pix2Struct model.
-        processor: The processor for handling image and text inputs.
-        img (np.array): The input image in BGR format.
-        question (str): The question related to the image.
-        answers (list): List of ground truth answers for evaluation.
-
-    Returns:
-        tuple: Contains the predicted answer and the ANLS score.
-    """
-    # Convert the image from BGR to RGB format
-    image_rgb = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-
-    # Process the image and question for model input
-    inputs = processor(images=image_rgb, text=question, return_tensors="pt").to(device)
-
-    # Generate predictions using the model
-    predictions = model.generate(**inputs)
-
-    # Decode the predicted output
-    predicted_answer = processor.decode(predictions[0], skip_special_tokens=True)
+    Load the pre-trained model and processor based on the model name.
     
-    # Calculate the ANLS score
-    anls_score_value = anls_score(prediction=predicted_answer, gold_labels=answers, threshold=0.5)
-
-    return predicted_answer, anls_score_value
-
-def calculate_gea_accuracy(model, processor, image, boxes, question, answers):
-    """
-    Calculates the Grounded Explanation Accuracy (GEA) based on the model's predictions 
-    for both shown and hidden regions in the image.
-
     Args:
-        model: The pre-trained Pix2Struct model.
-        processor: The processor for handling image and text inputs.
-        img_path (str): Path to the input image.
-        boxes (np.array): Array of bounding boxes.
-        question (str): The question related to the image.
-        answers (list): List of ground truth answers for evaluation.
-
+        model_name (str): Name of the model to load.
+        device (str): Device to load the model on ('cpu' or 'cuda').
+        
     Returns:
-        tuple: Contains the average difference in ANLS scores, and lists of ANLS scores 
-               for show and hide images.
+        Tuple[model, processor]: Loaded model and processor or None if model not supported.
     """
+    if model_name == "pix2struct":
+        model = Pix2StructForConditionalGeneration.from_pretrained("google/pix2struct-docvqa-base").to(device)
+        processor = Pix2StructProcessor.from_pretrained("google/pix2struct-docvqa-base")
+        return model, processor
+    elif model_name == "gpt":
+        return None, None
+    else:
+        raise ValueError("Unsupported model. Choose either 'pix2struct' or 'gpt'.")
+
+def save_results(result, show_anls, hide_anls, method, question_id):
+    """
+    Save GEA results to a JSON file.
     
-    # Initialize lists to hold ANLS scores for shown and hidden images
-    show_anls_scores = []
-    hide_anls_scores = []
+    Args:
+        result (float): GEA accuracy score.
+        show_anls (list): ANLS scores for visible regions.
+        hide_anls (list): ANLS scores for hidden regions.
+        method (str): Perturbation method.
+        question_id (str): Identifier for the question.
+    """
+    result_path = Path("results/sample_res")
+    result_path.mkdir(parents=True, exist_ok=True)
+    res_json = {"gea": result, "show": show_anls, "hide": hide_anls}
+    with open(result_path / f"gea_{method}_id_{question_id}.json", "w") as f:
+        json.dump(res_json, f, indent=4)
 
-    # Create show and hide images based on the provided boxes
-    img_show, img_hide = create_show_hide(image, boxes.copy())
+def plot_auc_curve(show_anls, hide_anls, question_id):
+    """
+    Plot and save the AUC curve for ANLS scores.
+    
+    Args:
+        show_anls (list): ANLS scores for visible regions.
+        hide_anls (list): ANLS scores for hidden regions.
+        question_id (str): Identifier for the question.
+    """
+    plot_path = Path("results/plots")
+    plot_path.mkdir(parents=True, exist_ok=True)
+    plt.plot(show_anls, label="Show")
+    plt.plot(hide_anls, label="Hide")
+    plt.legend()
+    plt.savefig(plot_path / f"gea_auc_{question_id}.png")
+    plt.close()
 
-    # Predict ANLS scores for the show and hide images
-    _, show_anls = predict_pix2struct(model, processor, img_show, question, answers)
-    _, hide_anls = predict_pix2struct(model, processor, img_hide, question, answers)
+def main():
+    args = create_args()
+    random.seed(SEED)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Calculate the base difference in ANLS scores
-    base_diff = show_anls - hide_anls
-    show_anls_scores.append(show_anls)
-    hide_anls_scores.append(hide_anls)
+    model, processor = load_model_and_processor(args.model_name, device)
+    data_path = Path(args.data_path)
+    test_set = json.load(open(data_path / args.set_path, "r"))
+    total_accuracy = 0
+    sample_count = min(len(test_set["data"]), 1)  # For demonstration, limiting to n samples
 
-    sum_diff = 0
-
-    # Iterate through 1 to 10 perturbations (according to shrinkings) and calculate ANLS scores
-    for i in tqdm(range(1, 11)): # we opt to shrink 10 times, but you can change this number
-        shrink_factor = i / 10
-        img_show, img_hide = create_show_hide(image, boxes.copy(), shrink_factor)
+    for sample in tqdm(test_set["data"][:sample_count]):
+        img_path = data_path / "imgs" / sample["image"]
+        question_id = str(sample["questionId"])
         
-        # Get ANLS scores for the perturbed images
-        _, show_anls = predict_pix2struct(model, processor, img_show, question, answers)
-        _, hide_anls = predict_pix2struct(model, processor, img_hide, question, answers)
+        # Load image and scale boxes to image dimensions
+        image = cv2.imread(str(img_path))
+        if image is None:
+            print(f"Image at {img_path} could not be loaded.")
+            continue
         
-        # Accumulate the differences
-        sum_diff += hide_anls - show_anls
-        show_anls_scores.append(show_anls)
-        hide_anls_scores.append(hide_anls)
+        height, width, _ = image.shape
+        boxes = np.array(sample["evidence"]["positions"]) * np.array([width, width, height, height])
 
-    # Calculate the average difference in ANLS scores
-    average_diff = (base_diff + sum_diff / 10) / 2
+        # Calculate GEA accuracy
+        accuracy, show_anls, hide_anls = calculate_gea_accuracy(
+            args.model_name, model, processor, image, boxes, sample["question"], 
+            sample["answers"], question_id, args.batch_size, GRID_SIZE, method=args.method
+        )
+        total_accuracy += accuracy
+        
+        # Save results
+        save_results(accuracy, show_anls, hide_anls, args.method, question_id)
+        
+        # Plot AUC curve if specified
+        if args.plot_auc:
+            plot_auc_curve(show_anls, hide_anls, question_id)
 
-    return average_diff, show_anls_scores, hide_anls_scores
+    average_accuracy = total_accuracy / sample_count
+    print(f"Average GEA: {average_accuracy}")
 
 if __name__ == "__main__":
-    # Set up argument parsing
-    parser = argparse.ArgumentParser(description='Calculate Grounded Explanation Accuracy (GEA)')
-    parser.add_argument('--model_name', type=str, default="pix2struct", help='Name of the model to use') # will be used with including more models
-    parser.add_argument('--set_path', type=str, default="examples/example.json", help='Path to the JSON dataset to test')
-    parser.add_argument('--plot_auc', type=bool, default=False, help='Plot the AUC curve')
-    args = parser.parse_args()
-
-    
-    random.seed(42)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    # Load the pre-trained model and processor
-    model = Pix2StructForConditionalGeneration.from_pretrained("google/pix2struct-docvqa-base").to(device)
-    processor = Pix2StructProcessor.from_pretrained("google/pix2struct-docvqa-base")
-
-    test_set = json.load(open(args.set_path, "r"))
-    for sample in  test_set["data"]:
-
-        img_path = sample["image"]
-        boxes = sample["evidence"]["positions"]
-        question = sample["question"]
-        answers = sample["answers"]
-
-        # Denormalize boxes and stack them into a numpy array
-        image = cv2.imread(img_path)
-        height, width, _ = image.shape
-        boxes = np.array([[box[0] * width, box[1] * width, box[2] * height, box[3] * height] for box in boxes])
-        
-        # Calculate the GEA accuracy
-        result, all_show_anls, all_hide_anls = calculate_gea_accuracy(model, processor, image, boxes, question, answers)
-        
-        # Print the results
-        print("GEA: ", result)
-        
-        if args.plot_auc:
-            # Plot the ANLS scores for show and hide images
-            plt.plot(all_show_anls, label="Show")
-            plt.plot(all_hide_anls, label="Hide")
-            plt.legend()
-
-            # Save the plot to a file
-            plt.savefig(f"examples/gea_auc_{sample['questionId']}.png")
-            plt.close()
+    main()

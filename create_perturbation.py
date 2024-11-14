@@ -32,13 +32,21 @@ def create_random_evidences(image, boxes, max_num_perturbations=5):
     Returns:
         np.array: Updated array of boxes including the random perturbation boxes.
     """
-    for _ in range(random.randint(1, max_num_perturbations)):
+    added_boxes = random.randint(1, max_num_perturbations)
+    max_trials = 20
+    while added_boxes > 0 and max_trials > 0:
         x_min = random.randint(0, image.shape[1] - 100)
-        x_max = random.randint(x_min + 1, image.shape[1])
+        x_max = random.randint(x_min + 40, image.shape[1])
         y_min = random.randint(0, image.shape[0] - 100)
-        y_max = random.randint(y_min + 1, image.shape[0])
+        y_max = random.randint(y_min + 40, image.shape[0])
 
-        boxes = np.vstack([boxes, [x_min, x_max, y_min, y_max]])
+        for box in boxes:
+            if x_min >= box[1] or x_max <= box[0] or y_min >= box[3] or y_max <= box[2]:
+                boxes = np.vstack([boxes, [x_min, x_max, y_min, y_max]])
+                added_boxes -= 1
+            else:
+                max_trials -= 1
+        
     return boxes
 
 def create_img_show(image, boxes):
@@ -62,6 +70,7 @@ def create_img_show(image, boxes):
 
     # Add more boxes
     boxes = create_random_evidences(image, boxes)
+
     for box in boxes:
         x_min, x_max, y_min, y_max = map(int, box)
         mask[y_min:y_max, x_min:x_max] = 1
@@ -122,7 +131,8 @@ def create_show_hide(image, boxes, shrink_factor=0.0):
     img_hide = create_img_hide(image, boxes)
 
     return img_show, img_hide
-def random_box_perturb(box, rand_factor=0.0, grid_size=10):
+
+def random_box_perturb(box, rand_factor=0.0, grid_size=0, grid_type="fixed"):
     """
     Randomly perturbs a box by dividing it into a grid and setting random grid cells to zero.
 
@@ -134,24 +144,50 @@ def random_box_perturb(box, rand_factor=0.0, grid_size=10):
         np.array: The mask with random perturbations applied.
     """
 
-    # divide box into 100 by 100 grid
-    grid_x = np.linspace(box[0], box[1], grid_size) - box[0]
-    grid_y = np.linspace(box[2], box[3], grid_size) - box[2]
-    
-    grid_x = grid_x.astype(int)
-    grid_y = grid_y.astype(int)
+    if grid_type == "fixed":
 
-    mask = np.ones((box[3] - box[2], box[1] - box[0], 3))
+        # divide box into grid_size by grid_size grid
+        grid_x = np.linspace(box[0], box[1], grid_size + 1) - box[0]
+        grid_y = np.linspace(box[2], box[3], grid_size + 1) - box[2]
+        
+        grid_x = grid_x.astype(int)
+        grid_y = grid_y.astype(int)
 
-    # randomely perturb rand factor of the grid to be zeros
-    for i in range(grid_size - 1):
-        for j in range(grid_size - 1):
-            if random.randint(0,9) < rand_factor*10:
-                mask[grid_y[i]:grid_y[i+1], grid_x[j]:grid_x[j+1]] = 0
+        mask = np.ones((box[3] - box[2], box[1] - box[0], 3))
+
+        # randomely perturb rand factor of the grid to be zeros
+        for i in range(grid_size):
+            for j in range(grid_size):
+                if random.randint(0,9) < rand_factor*10:
+                    mask[grid_y[i]:grid_y[i+1], grid_x[j]:grid_x[j+1]] = 0
+    else:
+        patch_size = 16 # use fixed patch size 16x16
+        grid_size_x = (box[1] - box[0])// patch_size if ((box[1] - box[0])//patch_size) > 0 else 1
+        grid_size_y = ((box[3] - box[2]))//patch_size if ((box[3] - box[2])//patch_size) > 0 else 1
+        grid_x = np.linspace(box[0], box[1], grid_size_x) - box[0]
+        grid_y = np.linspace(box[2], box[3], grid_size_y) - box[2]
+        
+        grid_x = grid_x.astype(int)
+        grid_y = grid_y.astype(int)
+
+        mask = np.ones((box[3] - box[2], box[1] - box[0], 3))
+
+        masked = 0
+        all_p = (len(grid_y)-1)*(len(grid_x)-1)
+        all_p = list(range(all_p))
+        random.shuffle(all_p)
+
+        all_p = all_p[:int(rand_factor*((len(grid_y)-1)*(len(grid_x)-1)))]  
+
+        for i in range(len(grid_y)-1):
+            for j in range(len(grid_x)-1):
+                if masked in all_p:
+                    mask[grid_y[i]:grid_y[i+1], grid_x[j]:grid_x[j+1]] = 0
+                masked += 1
     return mask
 
 
-def create_show_hide_box_perturb(image, boxes, rand_factor=0.0):
+def create_show_hide_box_perturb(image, boxes, rand_factor=0.0, grid_size=0):
     """
     Creates two versions of an image: one showing the regions inside the boxes, and the other hiding those regions.
     The boxes are perturbed by setting random grid cells to zero based on the random factor.
@@ -173,44 +209,69 @@ def create_show_hide_box_perturb(image, boxes, rand_factor=0.0):
     mask_show = np.zeros_like(image, dtype=np.uint8)
     mask_hide = np.ones_like(image, dtype=np.uint8)
 
-    # # Add more boxes
-    # boxes = create_random_evidences(image, boxes)
-
     for box in boxes:
         box = box.astype(int)
-        show_box_mask = random_box_perturb(box, rand_factor)
+        show_box_mask = random_box_perturb(box, rand_factor, grid_size)
         hide_box_mask = 1 - show_box_mask
-
-        mask_show[box[2]:box[3], box[0]:box[1]] = show_box_mask
         mask_hide[box[2]:box[3], box[0]:box[1]] = hide_box_mask
 
     # apply mask hide and show
-    image_show = apply_mask(image, mask_show, mean_color)
     image_hide = apply_mask(image, mask_hide, mean_color)
+
+    boxes = create_random_evidences(image, boxes)
+    
+    for box in boxes:
+        box = box.astype(int)
+        show_box_mask = random_box_perturb(box, rand_factor, grid_size)
+        mask_show[box[2]:box[3], box[0]:box[1]] = show_box_mask
+
+    image_show = apply_mask(image, mask_show, mean_color)
+    
 
     return image_show, image_hide
     
 
-
 if __name__ == "__main__":
 
     test = "perturb"
-    factor = 0.8
+    factor = 0.2
+    grid_size = 3
 
     # Load an example image and bounding boxes
-    img_path = "examples/fryn0081_p8.jpg"
-    boxes = np.array([[143., 882., 330., 415.],
-                    [145., 734., 396., 476.]])
-    image = cv2.imread(img_path)
+    img_path = "./data/imgs/kqbf0227_p0.jpg"
 
-    if test == "shrinking":
+    image = cv2.imread(img_path)
+    height, width = image.shape[:2]
+
+    norm_boxes = np.array([[
+                        0.1363,
+                        0.3991,
+                        0.4252,
+                        0.4496
+                    ],
+                    [
+                        0.1839,
+                        0.2839,
+                        0.503,
+                        0.5209
+                    ],
+                    [
+                        0.3975,
+                        0.4597,
+                        0.5043,
+                        0.5231
+                    ]])
+    
+    boxes = norm_boxes * np.array([width, width, height, height])
+
+    if test == "shrink":
         img_show, img_hide = create_show_hide(image, boxes, factor)
 
     elif test=="perturb":
-        img_show, img_hide = create_show_hide_box_perturb(image, boxes, factor)
+        img_show, img_hide = create_show_hide_box_perturb(image, boxes, factor, grid_size)
 
     # Display the original, show, and hide images
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(30, 30))
 
     plt.subplot(1, 3, 1)
     plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
