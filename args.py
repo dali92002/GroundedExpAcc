@@ -7,8 +7,8 @@ def create_args():
     parser.add_argument('--set_name', type=str, default="ann_pilot.json", help='Path to the JSON dataset to test')
     parser.add_argument('--data_path', type=str, default="./data/", help='Path to the data folder')
     parser.add_argument('--plot_auc', type=bool, default=False, help='Plot the AUC curve')
-    parser.add_argument('--method', type=str, default="perturb", help='Method to use for perturbation (shrink or perturb)')
-    parser.add_argument('--batch_size', type=int, default=1, help='Batch size for processing images')
+    parser.add_argument('--method', type=str, default="shrink", help='Method to use for perturbation (shrink or perturb)')
+    parser.add_argument('--batch_size', type=int, default=22, help='Batch size for processing images')
     parser.add_argument('--save_imgs', type=bool, default=False, help='Save the images for each perturbation')
     args = parser.parse_args()
     return args
