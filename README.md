@@ -22,7 +22,7 @@ The input data format is indicated in the following JSON. For this metric, the `
         {
             "questionId": 16404,
             "question": "What is the title of William M. Coleman ?",
-            "image": "examples/fryn0081_p8.jpg",
+            "image": "fryn0081_p8.jpg",
             "answers": [
                 "Sr. R&D Chemist"
             ],
